@@ -1,0 +1,161 @@
+{
+  "training_type": "synthetic_demo_only",
+  "random_seed": 2026,
+  "rows": 2500,
+  "training_rows": 2000,
+  "validation_rows": 500,
+  "class_counts": {
+    "Port Scan": 500,
+    "Data Exfiltration": 500,
+    "Brute Force": 500,
+    "DDoS": 500,
+    "Normal": 500
+  },
+  "attempts": [
+    {
+      "attempt": 1,
+      "parameters": {
+        "n_estimators": 120,
+        "max_depth": 12,
+        "min_samples_leaf": 2
+      },
+      "weighted_f1": 1.0
+    },
+    {
+      "attempt": 2,
+      "parameters": {
+        "n_estimators": 180,
+        "max_depth": 16,
+        "min_samples_leaf": 2
+      },
+      "weighted_f1": 1.0
+    },
+    {
+      "attempt": 3,
+      "parameters": {
+        "n_estimators": 240,
+        "max_depth": null,
+        "min_samples_leaf": 1
+      },
+      "weighted_f1": 1.0
+    },
+    {
+      "attempt": 4,
+      "parameters": {
+        "n_estimators": 320,
+        "max_depth": 20,
+        "min_samples_leaf": 1
+      },
+      "weighted_f1": 1.0
+    },
+    {
+      "attempt": 5,
+      "parameters": {
+        "n_estimators": 400,
+        "max_depth": null,
+        "min_samples_leaf": 2
+      },
+      "weighted_f1": 1.0
+    }
+  ],
+  "selected_parameters": {
+    "n_estimators": 120,
+    "max_depth": 12,
+    "min_samples_leaf": 2
+  },
+  "validation_accuracy": 1.0,
+  "validation_weighted_f1": 1.0,
+  "classification_report": {
+    "Brute Force": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 100.0
+    },
+    "DDoS": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 100.0
+    },
+    "Data Exfiltration": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 100.0
+    },
+    "Normal": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 100.0
+    },
+    "Port Scan": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 100.0
+    },
+    "accuracy": 1.0,
+    "macro avg": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 500.0
+    },
+    "weighted avg": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 500.0
+    }
+  },
+  "confusion_matrix_labels": [
+    "Brute Force",
+    "DDoS",
+    "Data Exfiltration",
+    "Normal",
+    "Port Scan"
+  ],
+  "confusion_matrix": [
+    [
+      100,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      100,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      100,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      100,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      100
+    ]
+  ],
+  "model_path": "ml\\artifacts\\random_forest.joblib",
+  "pipeline_path": "ml\\artifacts\\random_forest_pipeline.joblib",
+  "dataset_path": "ml\\datasets\\synthetic_labeled_flows.csv",
+  "warning": "Synthetic scenario metrics are not evidence of real-world detection performance."
+}
