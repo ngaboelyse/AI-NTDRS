@@ -19,6 +19,7 @@ LEGACY_CORE_TABLES = {"users", "roles", "devices", "network_flows", "alerts", "i
 def upgrade_database() -> None:
     backend_dir = Path(__file__).resolve().parents[2]
     config = Config(str(backend_dir / "alembic.ini"))
+    config.set_main_option("script_location", str(backend_dir / "migrations"))
     table_names = set(inspect(engine).get_table_names())
     if "alembic_version" not in table_names:
         if table_names and not LEGACY_CORE_TABLES.issubset(table_names):

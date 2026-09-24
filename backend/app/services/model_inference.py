@@ -13,6 +13,8 @@ import joblib
 import pandas as pd
 from sklearn.ensemble import IsolationForest, RandomForestClassifier
 
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
 
 
