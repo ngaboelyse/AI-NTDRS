@@ -1,0 +1,5 @@
+.env
+ai_ntdrs.db
+__pycache__/
+*.py[cod]
+.pytest_cache/

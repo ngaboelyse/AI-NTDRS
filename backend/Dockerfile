@@ -7,9 +7,14 @@ WORKDIR /app
 
 COPY pyproject.toml /app/
 COPY app /app/app
+COPY alembic.ini /app/alembic.ini
+COPY migrations /app/migrations
 
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir .
+
+RUN useradd --create-home --uid 10001 appuser
+USER appuser
 
 EXPOSE 8000
 

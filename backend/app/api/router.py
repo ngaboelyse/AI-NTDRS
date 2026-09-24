@@ -9,6 +9,8 @@ from app.api.alerts import router as alerts_router
 from app.api.dashboard import router as dashboard_router
 from app.api.auth import router as auth_router
 from app.api.devices import router as devices_router
+from app.api.telemetry import router as telemetry_router
+from app.api.response_actions import router as response_actions_router
 from app.api.health import router as health_router
 
 api_router = APIRouter()
@@ -22,3 +24,5 @@ api_router.include_router(reports_router, tags=["reports"])
 api_router.include_router(audit_logs_router, tags=["audit-logs"])
 api_router.include_router(copilot_router, tags=["copilot"])
 api_router.include_router(health_router, tags=["health"])
+api_router.include_router(telemetry_router, tags=["telemetry"])
+api_router.include_router(response_actions_router, tags=["response-actions"])

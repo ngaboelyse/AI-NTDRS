@@ -155,6 +155,18 @@ select {
   width: min(560px, 100%);
 }
 
+textarea {
+  width: 100%;
+  margin-top: 0.4rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #09111d;
+  color: var(--text);
+  padding: 0.85rem 0.95rem;
+  font: inherit;
+  resize: vertical;
+}
+
 .login-screen {
   min-height: 100vh;
   grid-template-columns: minmax(0, 1fr) minmax(360px, 470px);
@@ -720,6 +732,53 @@ select {
   }
 }
 
+.workspace-notice {
+  margin: 0 0 1rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid rgba(78, 161, 255, 0.3);
+  border-radius: 12px;
+  background: rgba(78, 161, 255, 0.08);
+  color: #cfe5ff;
+}
+
+.case-controls {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.case-controls label {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--muted);
+}
+
+.case-controls h4 { margin: 0.5rem 0 0; }
+.case-controls form { display: grid; gap: 0.7rem; }
+.case-controls button { justify-self: start; }
+
+.case-note {
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(9, 17, 29, 0.58);
+  overflow-wrap: anywhere;
+}
+
+.case-note small { display: block; margin-top: 0.35rem; color: var(--muted); }
+
+.device-register-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 0.85rem;
+}
+
+.device-register-form label { display: grid; gap: 0.25rem; color: var(--muted); }
+.device-register-form > div { grid-column: 1 / -1; }
+.device-register-form button { justify-self: start; }
+
 @media (max-width: 900px) {
   .login-screen {
     grid-template-columns: minmax(0, 1fr);
@@ -944,4 +1003,5 @@ select {
   .copilot-message,
   .copilot-welcome { max-width: 100%; }
   .copilot-composer button { min-width: 68px; }
+  .device-register-form { grid-template-columns: 1fr; }
 }

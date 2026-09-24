@@ -5,7 +5,10 @@ import type {
   Device,
   CopilotResponse,
   IncidentRecord,
+  IncidentNote,
+  ResponseActionRequest,
   ReportRecord,
+  SimulatedResponseAction,
   TokenResponse,
   User,
 } from '../types/api';
@@ -85,12 +88,52 @@ export async function getDevices(): Promise<Device[]> {
   return request<Device[]>('/devices');
 }
 
+export async function registerDevice(payload: { device_identifier: string; ip_address: string; hostname?: string; device_type: string }): Promise<Device> {
+  return request<Device>('/devices', { method: 'POST', body: JSON.stringify(payload) });
+}
+
 export async function getAlerts(): Promise<AlertRecord[]> {
   return request<AlertRecord[]>('/alerts');
 }
 
+export async function updateAlert(alertId: number, changes: { status?: string; assigned_analyst_id?: number | null; analyst_notes?: string | null }): Promise<AlertRecord> {
+  return request<AlertRecord>(`/alerts/${alertId}`, { method: 'PATCH', body: JSON.stringify(changes) });
+}
+
 export async function getIncidents(): Promise<IncidentRecord[]> {
   return request<IncidentRecord[]>('/incidents');
+}
+
+export async function updateIncident(incidentId: number, changes: { status?: string; summary?: string | null; assigned_analyst_id?: number | null }): Promise<IncidentRecord> {
+  return request<IncidentRecord>(`/incidents/${incidentId}`, { method: 'PATCH', body: JSON.stringify(changes) });
+}
+
+export async function getIncidentNotes(incidentId: number): Promise<IncidentNote[]> {
+  return request<IncidentNote[]>(`/incidents/${incidentId}/notes`);
+}
+
+export async function addIncidentNote(incidentId: number, body: string): Promise<IncidentNote> {
+  return request<IncidentNote>(`/incidents/${incidentId}/notes`, { method: 'POST', body: JSON.stringify({ body }) });
+}
+
+export async function getResponseActionRequests(): Promise<ResponseActionRequest[]> {
+  return request<ResponseActionRequest[]>('/response-actions/requests');
+}
+
+export async function requestResponseAction(payload: { incident_id: number; action_type: string; details: string }): Promise<ResponseActionRequest> {
+  return request<ResponseActionRequest>('/response-actions/requests', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export async function approveResponseAction(requestId: number): Promise<SimulatedResponseAction> {
+  return request<SimulatedResponseAction>(`/response-actions/requests/${requestId}/approve`, { method: 'POST' });
+}
+
+export async function rejectResponseAction(requestId: number): Promise<ResponseActionRequest> {
+  return request<ResponseActionRequest>(`/response-actions/requests/${requestId}/reject`, { method: 'POST' });
+}
+
+export async function getSimulatedResponseActions(): Promise<SimulatedResponseAction[]> {
+  return request<SimulatedResponseAction[]>('/response-actions');
 }
 
 export async function getReports(): Promise<ReportRecord[]> {

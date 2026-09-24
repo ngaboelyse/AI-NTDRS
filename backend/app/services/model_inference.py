@@ -21,7 +21,7 @@ class InferenceResult:
     """Result from model inference."""
     predicted_label: str
     anomaly_score: float
-    confidence: float
+    confidence: Optional[float]
     explanation: str
     model_name: str
 
@@ -101,7 +101,7 @@ class ModelInferenceService:
             return InferenceResult(
                 predicted_label="Unknown",
                 anomaly_score=0.0,
-                confidence=0.0,
+                confidence=None,
                 explanation="No anomaly detection model loaded",
                 model_name="None"
             )
@@ -115,12 +115,12 @@ class ModelInferenceService:
             normalized_score = min(1.0, max(0.0, anomaly_score / 0.5))
             
             label = "Anomalous" if prediction == -1 else "Normal"
-            confidence = min(0.95, 0.5 + normalized_score * 0.5)
+            # An anomaly score is not a calibrated probability.
             
             return InferenceResult(
                 predicted_label=label,
                 anomaly_score=normalized_score,
-                confidence=confidence,
+                confidence=None,
                 explanation=f"Isolation Forest detected {'anomalous' if label == 'Anomalous' else 'normal'} behavior",
                 model_name="IsolationForest"
             )
@@ -129,7 +129,7 @@ class ModelInferenceService:
             return InferenceResult(
                 predicted_label="Error",
                 anomaly_score=0.0,
-                confidence=0.0,
+                confidence=None,
                 explanation=f"Inference error: {str(e)}",
                 model_name="IsolationForest"
             )
@@ -148,7 +148,7 @@ class ModelInferenceService:
             return InferenceResult(
                 predicted_label="Unknown",
                 anomaly_score=0.0,
-                confidence=0.0,
+                confidence=None,
                 explanation="No classification model loaded",
                 model_name="None"
             )
@@ -156,14 +156,18 @@ class ModelInferenceService:
         try:
             transformed = self._random_forest_pipeline.transform(flow_features)
             prediction = self._random_forest.predict(transformed)[0]
-            probabilities = self._random_forest.predict_proba(transformed)[0]
-            confidence = float(max(probabilities))
-            
+            class_votes = self._random_forest.predict_proba(transformed)[0]
+            classes = list(self._random_forest.classes_)
+            if "Normal" in classes:
+                threat_vote_score = 1.0 - float(class_votes[classes.index("Normal")])
+            else:
+                threat_vote_score = float(max(class_votes))
+            # Relative tree votes are not calibrated probabilities.
             return InferenceResult(
                 predicted_label=str(prediction),
-                anomaly_score=1.0 if prediction != "Normal" else 0.0,
-                confidence=confidence,
-                explanation=f"Random Forest classified as {prediction}",
+                anomaly_score=min(1.0, max(0.0, threat_vote_score)),
+                confidence=None,
+                explanation=f"Random Forest classified as {prediction}; relative threat vote score {threat_vote_score:.2f} (uncalibrated)",
                 model_name="RandomForest"
             )
         except Exception as e:
@@ -171,7 +175,7 @@ class ModelInferenceService:
             return InferenceResult(
                 predicted_label="Error",
                 anomaly_score=0.0,
-                confidence=0.0,
+                confidence=None,
                 explanation=f"Classification error: {str(e)}",
                 model_name="RandomForest"
             )
@@ -195,7 +199,7 @@ class ModelInferenceService:
             return InferenceResult(
                 predicted_label="Unknown",
                 anomaly_score=0.0,
-                confidence=0.0,
+                confidence=None,
                 explanation="No ML models available",
                 model_name="None"
             )
@@ -214,5 +218,6 @@ def get_inference_service() -> ModelInferenceService:
     global _inference_service
     if _inference_service is None:
         _inference_service = ModelInferenceService()
-        _inference_service.load_models()
+        if settings.flow_model_enabled:
+            _inference_service.load_models()
     return _inference_service

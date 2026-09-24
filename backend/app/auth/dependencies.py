@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.database.session import get_db
 from app.models.user import User
 from app.auth.service import get_user_by_email
+from app.models.revoked_token import RevokedToken
 
 security_scheme = HTTPBearer(auto_error=False)
 
@@ -25,8 +26,11 @@ def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from exc
 
     subject = payload.get("sub")
-    if not subject:
+    token_id = payload.get("jti")
+    if not subject or not token_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token subject")
+    if db.get(RevokedToken, token_id) is not None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session has been logged out")
 
     user = get_user_by_email(db, subject)
     if user is None or not user.is_active:

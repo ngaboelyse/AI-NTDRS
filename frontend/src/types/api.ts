@@ -3,6 +3,7 @@ export interface User {
   email: string;
   full_name?: string | null;
   is_active: boolean;
+  roles: string[];
 }
 
 export interface TokenResponse {
@@ -44,6 +45,7 @@ export interface AlertRecord {
   detection_reason: string;
   model_confidence?: number | null;
   status: string;
+  assigned_analyst_id?: number | null;
   analyst_notes?: string | null;
   recommended_action?: string | null;
   resolution_time?: string | null;
@@ -59,6 +61,41 @@ export interface IncidentRecord {
   opened_at: string;
   last_activity_at: string;
   resolved_at?: string | null;
+}
+
+export interface IncidentNote {
+  id: number;
+  incident_id: number;
+  author_user_id: number;
+  body: string;
+  created_at: string;
+}
+
+export interface ResponseActionRequest {
+  id: number;
+  incident_id?: number | null;
+  alert_id?: number | null;
+  action_type: string;
+  details: string;
+  status: string;
+  requested_by_user_id: number;
+  approved_by_user_id?: number | null;
+  rejected_by_user_id?: number | null;
+  requested_at: string;
+  approved_at?: string | null;
+}
+
+export interface SimulatedResponseAction {
+  id: number;
+  incident_id?: number | null;
+  alert_id?: number | null;
+  action_type: string;
+  is_simulated: boolean;
+  requested_by_user_id: number;
+  approved_by_user_id?: number | null;
+  details?: string | null;
+  executed_at: string;
+  result: string;
 }
 
 export interface ReportRecord {

@@ -13,9 +13,10 @@ from app.schemas.flow import FlowCreate, FlowIngestionResult
 from app.services.model_registry import ensure_demo_model_version, ensure_trained_demo_model_version
 from app.services.risk import calculate_flow_risk, RiskWeights
 from app.services.model_inference import get_inference_service
+from app.core.config import settings
 
 
-def ingest_flow_record(db: Session, payload: FlowCreate) -> FlowIngestionResult:
+def ingest_flow_record(db: Session, payload: FlowCreate, *, commit: bool = True) -> FlowIngestionResult:
     device = db.get(Device, payload.device_id)
     if device is None:
         raise ValueError('Device not found')
@@ -41,11 +42,15 @@ def ingest_flow_record(db: Session, payload: FlowCreate) -> FlowIngestionResult:
     db.flush()
 
     # Attempt ML-based anomaly detection
-    inference_service = get_inference_service()
     ml_inference = None
     anomaly_score = 0.0
-    
-    if inference_service.is_ready():
+
+    if settings.flow_model_enabled:
+        inference_service = get_inference_service()
+    else:
+        inference_service = None
+
+    if inference_service is not None and inference_service.is_ready():
         try:
             # Prepare features for ML model
             flow_data = pd.DataFrame([{
@@ -87,7 +92,7 @@ def ingest_flow_record(db: Session, payload: FlowCreate) -> FlowIngestionResult:
         flow_id=flow.id,
         predicted_label=ml_inference.predicted_label if ml_inference else ('Suspicious' if risk.score >= 50 else 'Normal'),
         anomaly_score=ml_inference.anomaly_score if ml_inference else (risk.score / 100.0),
-        confidence=ml_inference.confidence if ml_inference else (0.94 if risk.score >= 50 else 0.78),
+        confidence=ml_inference.confidence if ml_inference else None,
         explanation_summary=ml_inference.explanation if ml_inference else 'Heuristic risk calculation based on flow metadata.',
         predicted_at=datetime.now(timezone.utc),
     )
@@ -144,7 +149,8 @@ def ingest_flow_record(db: Session, payload: FlowCreate) -> FlowIngestionResult:
         calculated_at=datetime.now(timezone.utc),
     )
     db.add(risk_score)
-    db.commit()
+    if commit:
+        db.commit()
 
     return FlowIngestionResult(
         flow_id=flow.id,

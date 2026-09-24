@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 
 from jose import jwt
 
@@ -14,5 +15,6 @@ def create_access_token(subject: str, expires_delta_minutes: int | None = None) 
         "sub": subject,
         "exp": expire_time,
         "iat": datetime.now(timezone.utc),
+        "jti": str(uuid4()),
     }
     return jwt.encode(payload, settings.secret_key, algorithm=JWT_ALGORITHM)

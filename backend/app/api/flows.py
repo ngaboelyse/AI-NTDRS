@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, and_
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, require_role
 from app.database.session import get_db
 from app.models.network_flow import NetworkFlow
 from app.schemas.flow import FlowCreate, FlowIngestionResult
@@ -63,7 +63,7 @@ def list_flows(
 def ingest_flow(
     payload: FlowCreate,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user),
+    current_user = Depends(require_role("Admin", "Security Analyst")),
 ) -> FlowIngestionResult:
     try:
         return ingest_flow_record(db, payload)

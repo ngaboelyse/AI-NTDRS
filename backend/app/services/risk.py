@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 from app.models.network_flow import NetworkFlow
@@ -24,7 +24,7 @@ class RiskResult:
     severity: str
     factors: dict[str, float]
     anomaly_detected: bool = False
-    confidence: float = field(default=0.0)
+    confidence: float | None = None
 
 
 def _severity_from_score(score: float) -> str:
@@ -69,12 +69,10 @@ def calculate_flow_risk(
     # Add ML anomaly score if provided
     anomaly_component = 0.0
     anomaly_detected = False
-    confidence = 0.78
     
     if anomaly_score is not None and anomaly_score > 0.5:
         anomaly_component = min(anomaly_score * weights.anomaly_score_weight, 20.0)
         anomaly_detected = True
-        confidence = min(0.5 + anomaly_score, 0.95)
 
     score = min(
         failed_connections 
@@ -98,5 +96,5 @@ def calculate_flow_risk(
             'anomaly_score': round(anomaly_component, 2),
         },
         anomaly_detected=anomaly_detected,
-        confidence=round(confidence, 2),
+        confidence=None,
     )

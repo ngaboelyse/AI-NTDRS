@@ -1,16 +1,26 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   clearToken,
+  addIncidentNote,
+  approveResponseAction,
   getAlerts,
   getAuditLogs,
   getCurrentUser,
   getDashboardSummary,
   getDevices,
   getIncidents,
+  getIncidentNotes,
   getReports,
+  getResponseActionRequests,
+  getSimulatedResponseActions,
   getStoredToken,
   login,
   queryCopilot,
+  requestResponseAction,
+  rejectResponseAction,
+  registerDevice,
+  updateAlert,
+  updateIncident,
   logout,
 } from './services/api';
 import type {
@@ -19,16 +29,16 @@ import type {
   DashboardSummary,
   Device,
   IncidentRecord,
+  IncidentNote,
   CopilotResponse,
+  ResponseActionRequest,
   ReportRecord,
+  SimulatedResponseAction,
   User,
 } from './types/api';
 
 type ViewKey = 'dashboard' | 'search' | 'devices' | 'alerts' | 'incidents' | 'reports' | 'audit-logs' | 'copilot';
 type CopilotTurn = { role: 'user' | 'assistant'; content: string };
-
-const demoEmail = 'admin@ai-ntdrs.local';
-const demoPassword = 'ChangeMe123!';
 
 const navigation: Array<{ key: ViewKey; label: string }> = [
   { key: 'dashboard', label: 'Dashboard' },
@@ -47,6 +57,9 @@ export default function App() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [alerts, setAlerts] = useState<AlertRecord[]>([]);
   const [incidents, setIncidents] = useState<IncidentRecord[]>([]);
+  const [incidentNotes, setIncidentNotes] = useState<IncidentNote[]>([]);
+  const [responseRequests, setResponseRequests] = useState<ResponseActionRequest[]>([]);
+  const [simulatedActions, setSimulatedActions] = useState<SimulatedResponseAction[]>([]);
   const [reports, setReports] = useState<ReportRecord[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogRecord[]>([]);
   const [copilotResponse, setCopilotResponse] = useState<CopilotResponse | null>(null);
@@ -56,6 +69,10 @@ export default function App() {
   const [view, setView] = useState<ViewKey>('dashboard');
   const [globalSearch, setGlobalSearch] = useState('');
   const [deviceSearch, setDeviceSearch] = useState('');
+  const [newDeviceIdentifier, setNewDeviceIdentifier] = useState('');
+  const [newDeviceIP, setNewDeviceIP] = useState('');
+  const [newDeviceHostname, setNewDeviceHostname] = useState('');
+  const [newDeviceType, setNewDeviceType] = useState('Workstation');
   const [alertSearch, setAlertSearch] = useState('');
   const [alertSeverity, setAlertSeverity] = useState('ALL');
   const [alertStatus, setAlertStatus] = useState('ALL');
@@ -66,22 +83,34 @@ export default function App() {
   const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null);
   const [selectedAlertId, setSelectedAlertId] = useState<number | null>(null);
   const [selectedIncidentId, setSelectedIncidentId] = useState<number | null>(null);
+  const [alertStatusDraft, setAlertStatusDraft] = useState('NEW');
+  const [alertNotesDraft, setAlertNotesDraft] = useState('');
+  const [incidentStatusDraft, setIncidentStatusDraft] = useState('NEW');
+  const [incidentSummaryDraft, setIncidentSummaryDraft] = useState('');
+  const [incidentNoteDraft, setIncidentNoteDraft] = useState('');
+  const [responseActionType, setResponseActionType] = useState('ISOLATE_ENDPOINT');
+  const [responseActionDetails, setResponseActionDetails] = useState('');
+  const [workspaceNotice, setWorkspaceNotice] = useState<string | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [email, setEmail] = useState(demoEmail);
-  const [password, setPassword] = useState(demoPassword);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
   async function loadWorkspace() {
-    const [currentUser, dashboardSummary, deviceList, alertList, incidentList, reportList, auditLogList] = await Promise.all([
-      getCurrentUser(),
+    const currentUser = await getCurrentUser();
+    const isResponder = currentUser.roles.some((role) => role === 'Admin' || role === 'Security Analyst');
+    const isAdmin = currentUser.roles.includes('Admin');
+    const [dashboardSummary, deviceList, alertList, incidentList, reportList, auditLogList, actionRequests, actions] = await Promise.all([
       getDashboardSummary(),
       getDevices(),
       getAlerts(),
       getIncidents(),
       getReports(),
-      getAuditLogs(),
+      isAdmin ? getAuditLogs() : Promise.resolve([] as AuditLogRecord[]),
+      isResponder ? getResponseActionRequests() : Promise.resolve([] as ResponseActionRequest[]),
+      isResponder ? getSimulatedResponseActions() : Promise.resolve([] as SimulatedResponseAction[]),
     ]);
 
     setUser(currentUser);
@@ -89,8 +118,115 @@ export default function App() {
     setDevices(deviceList);
     setAlerts(alertList);
     setIncidents(incidentList);
+    setIncidentNotes([]);
     setReports(reportList);
     setAuditLogs(auditLogList);
+    setResponseRequests(actionRequests);
+    setSimulatedActions(actions);
+  }
+
+  async function saveAlertChanges() {
+    if (!selectedAlert || !user) return;
+    try {
+      const updated = await updateAlert(selectedAlert.id, {
+        status: alertStatusDraft,
+        analyst_notes: alertNotesDraft,
+        assigned_analyst_id: user.id,
+      });
+      setAlerts((items) => items.map((item) => item.id === updated.id ? updated : item));
+      setWorkspaceNotice(`Alert ${updated.alert_id} saved and assigned to you.`);
+    } catch (updateError) {
+      setWorkspaceNotice(updateError instanceof Error ? updateError.message : 'Could not update alert.');
+    }
+  }
+
+  async function submitDevice(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    try {
+      const device = await registerDevice({
+        device_identifier: newDeviceIdentifier.trim(),
+        ip_address: newDeviceIP.trim(),
+        hostname: newDeviceHostname.trim() || undefined,
+        device_type: newDeviceType.trim(),
+      });
+      setDevices((items) => [device, ...items]);
+      setNewDeviceIdentifier('');
+      setNewDeviceIP('');
+      setNewDeviceHostname('');
+      await loadWorkspace();
+      setWorkspaceNotice(`Device ${device.device_identifier} registered.`);
+    } catch (deviceError) {
+      setWorkspaceNotice(deviceError instanceof Error ? deviceError.message : 'Could not register device.');
+    }
+  }
+
+  async function saveIncidentChanges() {
+    if (!selectedIncident || !user) return;
+    try {
+      const updated = await updateIncident(selectedIncident.id, {
+        status: incidentStatusDraft,
+        summary: incidentSummaryDraft,
+        assigned_analyst_id: user.id,
+      });
+      setIncidents((items) => items.map((item) => item.id === updated.id ? updated : item));
+      setWorkspaceNotice(`Incident ${updated.incident_code} saved and assigned to you.`);
+    } catch (updateError) {
+      setWorkspaceNotice(updateError instanceof Error ? updateError.message : 'Could not update incident.');
+    }
+  }
+
+  async function submitIncidentNote(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedIncident || !incidentNoteDraft.trim()) return;
+    try {
+      const note = await addIncidentNote(selectedIncident.id, incidentNoteDraft.trim());
+      setIncidentNotes((items) => [...items, note]);
+      setIncidentNoteDraft('');
+      setWorkspaceNotice('Investigation note added.');
+      await loadWorkspace();
+    } catch (noteError) {
+      setWorkspaceNotice(noteError instanceof Error ? noteError.message : 'Could not add note.');
+    }
+  }
+
+  async function submitResponseAction(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedIncident || responseActionDetails.trim().length < 10) return;
+    try {
+      const created = await requestResponseAction({
+        incident_id: selectedIncident.id,
+        action_type: responseActionType,
+        details: responseActionDetails.trim(),
+      });
+      setResponseRequests((items) => [created, ...items]);
+      setResponseActionDetails('');
+      setWorkspaceNotice('Response action awaits approval from a different administrator. No live control was changed.');
+    } catch (actionError) {
+      setWorkspaceNotice(actionError instanceof Error ? actionError.message : 'Could not request response action.');
+    }
+  }
+
+  async function approveSimulation(requestId: number) {
+    try {
+      const action = await approveResponseAction(requestId);
+      setSimulatedActions((items) => [action, ...items]);
+      setResponseRequests((items) => items.map((item) => item.id === requestId
+        ? { ...item, status: 'APPROVED_SIMULATED', approved_by_user_id: user?.id ?? null }
+        : item));
+      setWorkspaceNotice('Approved as a simulation only. No endpoint, account, or network control was changed.');
+    } catch (actionError) {
+      setWorkspaceNotice(actionError instanceof Error ? actionError.message : 'Could not approve simulation.');
+    }
+  }
+
+  async function rejectSimulation(requestId: number) {
+    try {
+      const result = await rejectResponseAction(requestId);
+      setResponseRequests((items) => items.map((item) => item.id === requestId ? result : item));
+      setWorkspaceNotice('Response action request rejected and recorded.');
+    } catch (actionError) {
+      setWorkspaceNotice(actionError instanceof Error ? actionError.message : 'Could not reject simulation request.');
+    }
   }
 
   useEffect(() => {
@@ -285,6 +421,25 @@ export default function App() {
     [filteredIncidents, selectedIncidentId],
   );
 
+  const canRespond = user?.roles.some((role) => role === 'Admin' || role === 'Security Analyst') ?? false;
+  const isAdmin = user?.roles.includes('Admin') ?? false;
+
+  useEffect(() => {
+    if (!selectedAlert) return;
+    setAlertStatusDraft(selectedAlert.status);
+    setAlertNotesDraft(selectedAlert.analyst_notes ?? '');
+  }, [selectedAlert]);
+
+  useEffect(() => {
+    if (!selectedIncident) {
+      setIncidentNotes([]);
+      return;
+    }
+    setIncidentStatusDraft(selectedIncident.status);
+    setIncidentSummaryDraft(selectedIncident.summary ?? '');
+    void getIncidentNotes(selectedIncident.id).then(setIncidentNotes).catch(() => setIncidentNotes([]));
+  }, [selectedIncident]);
+
   const notifications = useMemo(() => {
     const highSeverityAlerts = alerts
       .filter((alert) => alert.severity === 'HIGH' || alert.severity === 'CRITICAL')
@@ -388,7 +543,7 @@ export default function App() {
 
           <form className="auth-form" onSubmit={handleLogin}>
             <label htmlFor="login-email">Email or username</label>
-            <input id="login-email" value={email} onChange={(event) => setEmail(event.target.value)} type="text" autoComplete="username" placeholder="you@organization.com" required />
+            <input id="login-email" value={email} onChange={(event) => setEmail(event.target.value)} type="text" autoComplete="username" placeholder="Email or username" required />
 
             <label htmlFor="login-password">Password</label>
             <input id="login-password" value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="current-password" placeholder="Enter your password" required />
@@ -417,7 +572,7 @@ export default function App() {
           <h1>Security Operations Center</h1>
         </div>
         <nav aria-label="Primary navigation" className="nav-list">
-          {navigation.map((item) => (
+          {navigation.filter((item) => item.key !== 'audit-logs' || isAdmin).map((item) => (
             <button
               key={item.key}
               type="button"
@@ -447,6 +602,8 @@ export default function App() {
             <button type="button" onClick={handleLogout}>Logout</button>
           </div>
         </header>
+
+        {workspaceNotice ? <p className="workspace-notice" role="status">{workspaceNotice}</p> : null}
 
         {notificationsOpen ? (
           <section className="panel notification-panel">
@@ -634,6 +791,19 @@ export default function App() {
                 <button type="button" onClick={() => setDeviceSearch('')}>Clear</button>
               </div>
             </div>
+            {canRespond ? (
+              <form className="panel filter-panel device-register-form" onSubmit={submitDevice}>
+                <div>
+                  <p className="eyebrow">Onboard an authorized device</p>
+                  <p className="muted-text">Register its inventory IP before forwarding sensor events for it.</p>
+                </div>
+                <label>Device identifier<input value={newDeviceIdentifier} onChange={(event) => setNewDeviceIdentifier(event.target.value)} maxLength={100} required /></label>
+                <label>IP address<input value={newDeviceIP} onChange={(event) => setNewDeviceIP(event.target.value)} maxLength={45} required /></label>
+                <label>Hostname (optional)<input value={newDeviceHostname} onChange={(event) => setNewDeviceHostname(event.target.value)} maxLength={255} /></label>
+                <label>Device type<input value={newDeviceType} onChange={(event) => setNewDeviceType(event.target.value)} maxLength={100} required /></label>
+                <button type="submit" disabled={!newDeviceIdentifier.trim() || !newDeviceIP.trim()}>Register device</button>
+              </form>
+            ) : null}
             <TableFrame emptyMessage="No devices available.">
               <SimpleTable
                 headers={["Device", "IP Address", "Type", "Status", "Risk", "Alerts"]}
@@ -699,9 +869,9 @@ export default function App() {
                     <option value="ALL">All statuses</option>
                     <option value="NEW">NEW</option>
                     <option value="INVESTIGATING">INVESTIGATING</option>
-                    <option value="ACKNOWLEDGED">ACKNOWLEDGED</option>
+                    <option value="ESCALATED">ESCALATED</option>
                     <option value="RESOLVED">RESOLVED</option>
-                    <option value="FALSE POSITIVE">FALSE POSITIVE</option>
+                    <option value="FALSE_POSITIVE">FALSE POSITIVE</option>
                   </select>
                 </label>
                 <button type="button" onClick={() => {
@@ -726,6 +896,7 @@ export default function App() {
               <article className="panel">
                 <p className="eyebrow">Alert Investigation</p>
                 {selectedAlert ? (
+                  <>
                   <div className="detail-grid">
                     <DetailItem label="Alert ID" value={selectedAlert.alert_id} />
                     <DetailItem label="Severity" value={selectedAlert.severity} />
@@ -736,6 +907,22 @@ export default function App() {
                     <DetailItem label="Destination" value={selectedAlert.destination_ip} />
                     <DetailItem label="Confidence" value={selectedAlert.model_confidence ? `${Math.round(selectedAlert.model_confidence * 100)}%` : 'Unknown'} />
                   </div>
+                  {canRespond ? (
+                    <div className="case-controls">
+                      <label>Status
+                        <select value={alertStatusDraft} onChange={(event) => setAlertStatusDraft(event.target.value)}>
+                          <option value="NEW">NEW</option><option value="INVESTIGATING">INVESTIGATING</option>
+                          <option value="ESCALATED">ESCALATED</option><option value="RESOLVED">RESOLVED</option>
+                          <option value="FALSE_POSITIVE">FALSE POSITIVE</option>
+                        </select>
+                      </label>
+                      <label>Investigation notes
+                        <textarea value={alertNotesDraft} onChange={(event) => setAlertNotesDraft(event.target.value)} maxLength={5000} rows={4} />
+                      </label>
+                      <button type="button" onClick={() => void saveAlertChanges()}>Save and assign to me</button>
+                    </div>
+                  ) : <p className="muted-text">Your account has read-only access to alert investigations.</p>}
+                  </>
                 ) : (
                   <p className="muted-text">Select an alert to inspect the detection context.</p>
                 )}
@@ -768,9 +955,9 @@ export default function App() {
                     <option value="ALL">All statuses</option>
                     <option value="NEW">NEW</option>
                     <option value="INVESTIGATING">INVESTIGATING</option>
-                    <option value="ACKNOWLEDGED">ACKNOWLEDGED</option>
+                    <option value="CONTAINED">CONTAINED</option>
                     <option value="RESOLVED">RESOLVED</option>
-                    <option value="FALSE POSITIVE">FALSE POSITIVE</option>
+                    <option value="CLOSED">CLOSED</option>
                   </select>
                 </label>
                 <button type="button" onClick={() => {
@@ -794,6 +981,7 @@ export default function App() {
               <article className="panel">
                 <p className="eyebrow">Incident Investigation</p>
                 {selectedIncident ? (
+                  <>
                   <div className="detail-grid">
                     <DetailItem label="Incident" value={selectedIncident.incident_code} />
                     <DetailItem label="Title" value={selectedIncident.title} />
@@ -802,6 +990,58 @@ export default function App() {
                     <DetailItem label="Updated" value={selectedIncident.last_activity_at} />
                     <DetailItem label="Summary" value={selectedIncident.summary ?? 'No summary available'} />
                   </div>
+                  {canRespond ? (
+                    <div className="case-controls">
+                      <label>Status
+                        <select value={incidentStatusDraft} onChange={(event) => setIncidentStatusDraft(event.target.value)}>
+                          <option value="NEW">NEW</option><option value="INVESTIGATING">INVESTIGATING</option>
+                          <option value="CONTAINED">CONTAINED</option><option value="RESOLVED">RESOLVED</option>
+                          <option value="CLOSED">CLOSED</option>
+                        </select>
+                      </label>
+                      <label>Case summary
+                        <textarea value={incidentSummaryDraft} onChange={(event) => setIncidentSummaryDraft(event.target.value)} maxLength={500} rows={3} />
+                      </label>
+                      <button type="button" onClick={() => void saveIncidentChanges()}>Save and assign to me</button>
+                      <h4>Investigation notes</h4>
+                      {incidentNotes.map((note) => <p className="case-note" key={note.id}>{note.body}<small>{new Date(note.created_at).toLocaleString()}</small></p>)}
+                      <form onSubmit={submitIncidentNote}>
+                        <label>Add a case note
+                          <textarea value={incidentNoteDraft} onChange={(event) => setIncidentNoteDraft(event.target.value)} maxLength={10000} rows={3} required />
+                        </label>
+                        <button type="submit" disabled={!incidentNoteDraft.trim()}>Add note</button>
+                      </form>
+                      <form onSubmit={submitResponseAction}>
+                        <h4>Request a response simulation</h4>
+                        <p className="muted-text">Requires a separate administrator approval. No live network or endpoint control is executed.</p>
+                        <label>Action
+                          <select value={responseActionType} onChange={(event) => setResponseActionType(event.target.value)}>
+                            <option value="ISOLATE_ENDPOINT">Isolate endpoint</option>
+                            <option value="BLOCK_INDICATOR">Block indicator</option>
+                            <option value="DISABLE_ACCOUNT">Disable account</option>
+                          </select>
+                        </label>
+                        <label>Reason and scope
+                          <textarea value={responseActionDetails} onChange={(event) => setResponseActionDetails(event.target.value)} minLength={10} maxLength={2000} rows={3} required />
+                        </label>
+                        <button type="submit" disabled={responseActionDetails.trim().length < 10}>Request approval</button>
+                      </form>
+                      <h4>Pending approvals</h4>
+                      {responseRequests.filter((item) => item.incident_id === selectedIncident.id).map((item) => (
+                        <div className="case-note" key={item.id}>
+                          <strong>{item.action_type}</strong> · {item.status}<p>{item.details}</p>
+                          {isAdmin && item.status === 'PENDING_APPROVAL' && item.requested_by_user_id !== user?.id
+                            ? <><button type="button" onClick={() => void approveSimulation(item.id)}>Approve simulation</button>{' '}<button type="button" onClick={() => void rejectSimulation(item.id)}>Reject request</button></>
+                            : null}
+                        </div>
+                      ))}
+                      <h4>Simulated actions</h4>
+                      {simulatedActions.filter((item) => item.incident_id === selectedIncident.id).map((item) => (
+                        <p className="case-note" key={item.id}><strong>{item.action_type}</strong> · SIMULATED · {new Date(item.executed_at).toLocaleString()}</p>
+                      ))}
+                    </div>
+                  ) : <p className="muted-text">Your account has read-only access to incident investigations.</p>}
+                  </>
                 ) : (
                   <p className="muted-text">Select an incident to review its current state.</p>
                 )}
